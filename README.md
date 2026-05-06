@@ -42,11 +42,13 @@ AI Data Center Network 참여형 스터디 자료 모음
 - [LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale](https://arxiv.org/abs/2208.07339) (2022.08)
 - [Scaling Laws for Neural Language Models](https://arxiv.org/abs/2001.08361) (2020.01)
 
-## GPU Specs
+## GPU
 - [H100 Tensor Core GPU Architecture](https://resources.nvidia.com/en-us-hopper-architecture/nvidia-h100-tensor-c)
 - [NVIDIA Blackwell Architecture Technical Brief](https://resources.nvidia.com/en-us-blackwell-architecture)
   - [NVFP4 Trains with Precision of 16-Bit and Speed and Efficiency of 4-Bit](https://developer.nvidia.com/blog/nvfp4-trains-with-precision-of-16-bit-and-speed-and-efficiency-of-4-bit/?ncid=no-ncid) (2025.08)
   - [Using FP8 and FP4 with Transformer Engine](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/examples/fp8_primer.html)
+- [NCCL and Communication Collectives](https://roycho96.github.io/posts/nccl-collectives/)
+- [NCCL Algorithms](https://roycho96.github.io/posts/nccl-algorithms/)
 
 ## LLM Arch
 - [LLM Architecture Gallery](https://sebastianraschka.com/llm-architecture-gallery/)
