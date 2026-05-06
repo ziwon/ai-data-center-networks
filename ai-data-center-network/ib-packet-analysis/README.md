@@ -21,6 +21,7 @@ This report analyzes the packet captures in the `ib-packets` directory using `ts
 - [Inferred Capture Method](#inferred-capture-method)
 - [InfiniBand Protocol Stack](#infiniband-protocol-stack)
 - [InfiniBand Layers Visible in the Captures](#infiniband-layers-visible-in-the-captures)
+- [ERF Capture Anatomy](#erf-capture-anatomy)
 - [InfiniBand Packet Structure](#infiniband-packet-structure)
 - [RDMA Read/Write Packet Analysis Model](#rdma-readwrite-packet-analysis-model)
 - [Control Path vs Data Path](#control-path-vs-data-path)
@@ -72,8 +73,9 @@ This report intentionally separates packet evidence from explanatory reference m
 | RDMA READ | Reference model only | Added to explain `BTH + RETH` request and response packet behavior for future captures |
 | RDMA WRITE | Reference model only | Added to explain `BTH + RETH + payload` request behavior for future captures |
 | NCCL collective traffic | Not present | Use the official [NCCL collective operations](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html), [NCCL networking troubleshooting](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/troubleshooting.html#networking-issues), and [NVIDIA/nccl-tests](https://github.com/NVIDIA/nccl-tests) references instead of expanding it here |
+| Bit-level packet format reference | Companion document | [`packet-format-reference.md`](packet-format-reference.md) — LRH/GRH/BTH/extended headers/MAD/SMP DR/IPoIB bit layouts and the full BTH opcode master table |
 
-When reading the report, treat the observed sections as analysis of the provided pcap files. Treat the RDMA READ/WRITE section as a packet-analysis guide for future captures that include one-sided RDMA operations.
+When reading the report, treat the observed sections as analysis of the provided pcap files. Treat the RDMA READ/WRITE section as a packet-analysis guide for future captures that include one-sided RDMA operations. For byte- and bit-level field layouts that the report references but does not exhaustively tabulate, see the [companion packet format reference](packet-format-reference.md).
 
 ## Capture Set
 
@@ -262,9 +264,142 @@ Important visible headers:
 | AETH | ACK Extended Transport Header | RC Acknowledge packets in `infiniband.pcap` |
 | IP payload | IP over InfiniBand | TCP/SSH and ICMP over IPoIB |
 
+## ERF Capture Anatomy
+
+The captures use the Endace **Extensible Record Format** (ERF) as the outer wrapper. Each on-wire InfiniBand frame is encapsulated by an ERF record emitted by the capture device, and `tshark` dissects this outer record before handing the inner bytes to the InfiniBand dissector. Understanding what ERF preserves vs hides is what separates "I see a packet" from "I know exactly what the sniffer recorded."
+
+```mermaid
+flowchart LR
+    PHY["Physical layer<br/>8b/10b or 64b/66b symbols<br/>training, idle, recovery"]
+    LFC["Link-level flow control<br/>FCCL / FCTBS credits"]
+    ERF["ERF outer record<br/>ts, type, flags, rlen, wlen"]
+    IB["InfiniBand frame<br/>LRH → (GRH) → BTH → ext → payload → ICRC/VCRC"]
+
+    PHY -.discarded.-> ERF
+    LFC -.discarded.-> ERF
+    ERF --> IB
+```
+
+### ERF Outer Record
+
+The ERF record is small but carries every piece of metadata the sniffer hardware can supply. All seven captures use ERF type `0x15` (INFINIBAND), which is set by the capture device firmware and is the strongest single piece of evidence that the recording came from an IB-aware sniffer rather than a host-side `tcpdump`.
+
+| ERF field | Filter name | Example (`infiniband.pcap` frame 10) | Meaning |
+| --- | --- | --- | --- |
+| Timestamp | `erf.ts` | `0x482b41f8ae3041c0` | 64-bit fractional-seconds hardware timestamp |
+| Record type | `erf.types` | `0x15` (Type 21: INFINIBAND) | Identifies inner payload as native IB |
+| Extension header present | `erf.types.ext_header` | `0` | No ERF extension headers in this dataset |
+| Capture interface | `erf.flags.cap` | `1` (Port B) | Which sniffer port observed this frame |
+| Varying record length | `erf.flags.vlen` | `1` | Record length varies per frame |
+| Truncated | `erf.flags.trunc` | `0` | Frame was captured at full wire length |
+| RX error | `erf.flags.rxe` | `0` | Capture device flagged no receive error |
+| DS error | `erf.flags.dse` | `0` | No data-stream error |
+| Record length | `erf.rlen` | `136` | ERF record bytes including padding |
+| Loss counter | `erf.lctr` | `0` | Frames dropped between this and the previous record |
+| Wire length | `erf.wlen` | `114` | Original on-wire byte count |
+
+The pair `rlen` (136) vs `wlen` (114) shows ERF's per-record padding to alignment boundaries. For timing analysis, `erf.ts` is the authoritative clock — `frame.time_relative` derives from it but rounds to microseconds in some output modes.
+
+### Capture-Interface Topology
+
+ERF's `flags.cap` field tells you which sniffer port saw each frame, which is essential for interpreting bidirectional flows.
+
+| File | Capture interfaces used | Implication |
+| --- | --- | --- |
+| `infiniband.pcap` | `0` and `1` | Bidirectional tap; both link directions captured |
+| All other pcaps | `0` only | Single-direction tap |
+
+Concrete evidence from `infiniband.pcap`:
+
+```text
+Frame 10  (RC SEND Only,    DLID=1, SLID=4)  → Capture interface 1 (Port B), ts=0x482b41f8ae3041c0
+Frame 11  (RC Acknowledge,  DLID=4, SLID=1)  → Capture interface 0 (Port A), ts=0x482b41f8ae30ede0
+```
+
+The SEND and its ACK arrive on different sniffer ports because they travel in opposite directions on the link. In single-interface captures this asymmetry is invisible — you may only see one half of an exchange depending on which port was tapped.
+
+### What ERF Preserves vs Hides
+
+The ERF wrapper is thin, but the IB dissector behind it is comprehensive. The "simplification" you might perceive comes from two places: (a) hardware events that occur below the packet boundary and never become packets, and (b) the IB dissector's choice of which fields to expose as filterable names vs tree-only fields.
+
+| Layer / signal | Visible in `tshark`? | Notes |
+| --- | --- | --- |
+| Physical 8b/10b or 64b/66b symbols | No | Decoded by HCA SerDes; never reach the capture host |
+| Link training, recovery, idle symbols | No | Sub-packet events, discarded by the link layer |
+| Link-level flow-control credits (FCCL, FCTBS) | No | Carried in dedicated link-level subheaders, not delivered as IB packets |
+| Inter-packet gaps and bandwidth headroom | No | Reconstruct from `erf.ts` deltas instead |
+| Frames dropped or rejected by sniffer hardware | Partial | Visible only as a non-zero `erf.lctr` jump |
+| RX-error frames | Conditional | Forwarded with `erf.flags.rxe = 1` if the device is configured to keep them |
+| LRH | Yes | `infiniband.lrh.*` (slid, dlid, lnh, vl, sl, packet length) |
+| GRH | Only when `LRH.LNH = 0x3` | All packets in this set carry `LNH = 0x2`, so GRH is correctly absent |
+| BTH and extended headers | Yes | DETH, AETH, MAD, RETH (when present) all decoded |
+| Payload (MAD, IPoIB IP/TCP/ICMP) | Yes | Standard upper-layer dissection |
+| Invariant CRC | Yes | `infiniband.invariant.crc`, e.g. `0x0acca5df` in frame 10 |
+| Variant CRC | Yes | `infiniband.variant.crc`, e.g. `0x24a8` in frame 10 |
+
+A common misconception is that ERF strips ICRC/VCRC. In this dataset both are present in the IB tree and are filterable as `infiniband.invariant.crc` and `infiniband.variant.crc`. The Wireshark IB dissector does not auto-validate them, however; integrity is asserted by the capture device's RX-error flag (`erf.flags.rxe`), not by the dissector.
+
+### Worked Example: ERF + IB Frame Layout
+
+The following anonymized layout is `infiniband.pcap` frame 10 (the RC SEND Only carrying an IPoIB ICMP echo request). It demonstrates how the ERF outer record, the InfiniBand headers, the EtherType-encapsulated IPoIB payload, and the trailing CRCs all coexist in a single 114-byte wire frame.
+
+```text
+Frame 10 — 114 bytes wire / 136-byte ERF record / capture interface 1 (Port B)
+
+ERF outer record
+  Timestamp:   0x482b41f8ae3041c0
+  Type:        0x15 (INFINIBAND)
+  Ext header:  0
+  Flags:       cap=1, vlen=1, trunc=0, rxe=0, dse=0
+  Record len:  136
+  Loss counter: 0
+  Wire length: 114
+
+InfiniBand
+  LRH (Local Route Header)
+    VL = 0
+    Service Level = 0
+    LNH = 0x2  (BTH only — no GRH)
+    DLID = 1, SLID = 4
+    Packet length = 28 (4-byte words)
+  BTH (Base Transport Header)
+    Opcode = 4  (RC SEND Only)
+    Solicited Event = False
+    MigReq = True
+    Pad Count = 0
+    P_Key = 0xffff
+    Destination QP = <masked>
+    Acknowledge Request = True
+    PSN = <masked>
+  IBA Payload — EtherType-encapsulated for IPoIB
+    Ethertype = 0x0800 (IPv4)
+  Invariant CRC: 0x0acca5df
+  Variant CRC:   0x24a8
+
+IPv4 → ICMP Echo request
+  Src 10.0.1.34 → Dst 10.0.0.58
+```
+
+A few details worth noticing:
+
+- `LRH.LNH = 0x2` confirms local-subnet routing, which is why no `GRH` appears between `LRH` and `BTH`.
+- The `IBA Payload — EtherType-encapsulated` line is the IPoIB shim: a 4-byte header with an EtherType selecting IPv4 or ARP, sitting between the BTH and the IP packet. This is the layer that lets ordinary IP applications run over IB.
+- Both `Invariant CRC` and `Variant CRC` are present in the dissection tree. ICRC covers everything except mutable fields; VCRC covers the entire packet on the link.
+- `MigReq = True` indicates the path supports automatic path migration. This is a per-QP attribute set during connection setup and is unrelated to the data being carried.
+
+### Key Takeaways
+
+- ERF is a **thin metadata wrapper**; nearly every IB header field, including ICRC/VCRC, survives into the dissection tree. The "simplification" is real only at sub-packet hardware-event level.
+- Use `erf.ts` for nanosecond-resolution timing analysis (e.g., the one-second `ibping` cadence in `ib_ibping_sniffer.pcap` is precisely measurable from this field).
+- Use `erf.flags.cap` to distinguish link directions in `infiniband.pcap`, and to recognize that single-interface captures may show only one half of a bidirectional exchange.
+- Use `erf.lctr` to detect sniffer drops; a non-zero value means there is a gap in the recording that no amount of IB-layer analysis can recover.
+- Conclusions about link credit exhaustion, link training, or symbol-error rates require switch counters and HCA hardware diagnostics — they are intrinsically not in the pcap, regardless of which sniffer was used.
+
 ## InfiniBand Packet Structure
 
 Building on the encapsulation diagram above, an InfiniBand packet can be read from left to right as **fabric routing**, **transport selection**, **operation-specific metadata**, and **payload**. The exact extended header depends on the transport and opcode.
+
+> For bit-level field layouts of every header listed here (LRH, GRH, BTH, DETH, RETH, AETH, AtomicETH, ImmDt, IETH, RDETH, XRCETH, MAD, SMP DR, IPoIB encap), the AETH syndrome encoding, and the full BTH opcode master table, see the companion [`packet-format-reference.md`](packet-format-reference.md). This section gives the high-level packet shape; the reference document drills down to byte and bit boundaries.
 
 ```mermaid
 flowchart LR
@@ -278,7 +413,7 @@ flowchart LR
     LRH --> GRH --> BTH --> EXT --> PAYLOAD --> CRC
 ```
 
-`GRH` is optional, so many local-subnet packets are effectively `LRH -> BTH -> ...`. Some capture paths also hide or normalize link-level CRC details, so the CRC fields may be more important as an on-wire concept than as a visible field in every `tshark` decode.
+`GRH` is optional, so many local-subnet packets are effectively `LRH -> BTH -> ...`. In this dataset every packet carries `LRH.LNH = 0x2`, which is why no `GRH` is decoded. Whether `ICRC`/`VCRC` are exposed depends on the capture path; this dataset preserves both as filterable fields (`infiniband.invariant.crc`, `infiniband.variant.crc`) — see [ERF Capture Anatomy](#erf-capture-anatomy) for evidence and the full preservation matrix.
 
 Common packet shapes:
 
@@ -682,12 +817,37 @@ PERF (ClassPortInfo)
 PERF (PortCountersExtended)
 ```
 
+LID-pair distribution (65 packets total):
+
+| Source LID | Dest LID | MAD class | Method | Packets | Likely workload |
+| ---: | ---: | --- | --- | ---: | --- |
+| 5 | 8 | `0x32` Vendor OUI | Get | 11 | `ibping` request |
+| 8 | 5 | `0x32` Vendor OUI | GetResp | 11 | `ibping` reply |
+| 5 | 1 | `0x04` PerfMgt | Get | 27 | `PortCounters` poll |
+| 5 | 4 | `0x04` PerfMgt | Get | 12 | `PortCounters` poll |
+| 5 | 2 | `0x04` PerfMgt | Get | 2 | `PortCounters` poll |
+| 2 | 5 | `0x04` PerfMgt | GetResp | 2 | `PortCounters` reply |
+
+The vendor MAD class `0x32` is what `ibping` uses to carry its own request/response, separate from the standard PerfMgt class `0x04`. The `ibping` exchange is exclusively LID 5 ↔ LID 8 (22 of 65 packets, perfectly symmetric request/response). The remaining 43 packets are background perfquery-style polling originating from LID 5, with only LID 2 replying within the capture window.
+
+Reproducing this breakdown:
+
+```sh
+tshark -r ../ib-packets/ib_ibping_sniffer.pcap \
+  -T fields \
+  -e infiniband.lrh.slid \
+  -e infiniband.lrh.dlid \
+  -e infiniband.mad.mgmtclass \
+  -e infiniband.mad.method \
+  | sort | uniq -c
+```
+
 Interpretation:
 
 - `ibping` uses InfiniBand management-style traffic rather than IP ping.
-- The capture shows request/response behavior between LID 5 and LID 8.
+- The `ibping` request/response pair is between LID 5 and LID 8, carried over the vendor MAD class `0x32`.
 - The periodic pattern is visible: requests and responses are roughly one second apart.
-- Performance Management traffic is also present.
+- Performance Management traffic from a separate tool (likely `perfquery`) is mixed into the same capture window, which is why LIDs 1, 2, and 4 also appear.
 
 Why it matters for Chapter 1:
 
@@ -1086,6 +1246,10 @@ tshark -r ../ib-packets/<rdma-read-write-capture>.pcap \
 
 
 ## References
+
+### Companion documents
+
+- [`packet-format-reference.md`](packet-format-reference.md) — bit-level layouts for every IB header used in this dataset, plus the full BTH opcode master table and operation→extended-header mapping.
 
 ### NVIDIA official documentation
 - [NVIDIA Introduction to InfiniBand™](https://network.nvidia.com/pdf/whitepapers/IB_Intro_WP_190.pdf)
