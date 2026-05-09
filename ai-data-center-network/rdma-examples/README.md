@@ -869,6 +869,12 @@ DMA 안정성을 위해 **페이지 정렬**을 권장함. `aligned_alloc(4096, 
 [Kernel/HW]      WQE (Work Queue Element) ←→ CQE (Completion Queue Element)
 ```
 
+<p align="center">
+<img src="./wr-wqe-cqe-flow.svg" width="85%">
+</p>
+
+WR은 사용자가 `ibv_post_send()`에 넘기는 API 레벨 요청이고, 드라이버/HCA는 이를 **WQE로 변환해 Work Queue에** 배치함. 완료 결과는 하드웨어의 CQE로 생성되고, `ibv_poll_cq()`를 통해 사용자에게 WC 형태로 전달됨.
+
 - **WR/WC**: 사용자가 API로 다루는 구조체. `struct ibv_send_wr`, `struct ibv_wc` ← 사용자가 만지는 것
 - **WQE/CQE**: 드라이버가 HCA에게 넘기는 실제 큐 엔트리. **vendor마다 다름** (ConnectX-6/7 다르고 BlueField도 다름)
 
@@ -952,7 +958,7 @@ LLM 서빙/학습 스택 기준 RDMA가 사용되는 위치임:
 - **NIXL (NVIDIA Inference Xfer Library)**: KV cache 전송용 RDMA 추상화임
 - **Mooncake / vLLM disaggregated**: prefill→decode 노드 간 KV cache를 RDMA Read로 pull
 - **MPI (`OpenMPI`, `MPICH`)**: UCX 위에서 RDMA로 polling
-- **분산 스토리지 (Ceph, DAOS, WekaFS)**: 데이터 path가 RDMA임
+- **분산 스토리지 (IBM ESS/Storage Scale(GPFS), DAOS, WekaFS 등)**: storage client와 server 사이의 data path에 RDMA 사용이 가능함
 
 이 라이브러리 내부에 들어가지 않더라도, 어떤 layer가 어떻게 RDMA를 쓰는지 알면 스택 디버깅과 튜닝 수준이 달라짐.
 
@@ -994,5 +1000,22 @@ opcode:
 
 ---
 
-*References*
+## 부록. OpenAI MRC: 초대규모 AI 학습 네트워크 사례
+
+OpenAI는 2026년에 **MRC(Multipath Reliable Connection)** 라는 네트워크 프로토콜을 공개함. MRC는 RoCE를 기반으로 하되, 10만 GPU 이상 규모의 동기식 학습에서 발생하는 혼잡과 장애 문제를 줄이기 위해 설계된 방식임.
+
+핵심 아이디어는 세 가지임:
+- **Multi-plane 네트워크**: 하나의 800Gb/s NIC를 여러 개의 100Gb/s 링크처럼 나누고, 독립적인 여러 네트워크 plane으로 분산함
+- **Packet spraying**: 하나의 전송을 단일 경로에 고정하지 않고 수백 개 경로로 패킷을 분산함
+- **SRv6 기반 source routing**: 스위치의 동적 라우팅에 의존하지 않고, 송신 측이 패킷 경로를 지정함
+
+이 방식의 목표는 단순히 평균 bandwidth를 높이는 것이 아니라, **동기식 AI 학습에서 가장 치명적인 tail latency와 장애 전파를 줄이는 것**임. 큰 학습 job에서는 일부 GPU나 링크가 느려지는 것만으로 전체 step이 지연될 수 있음. MRC는 경로 장애를 빠르게 우회하고, 혼잡 경로를 피하며, 네트워크 control plane을 단순하게 유지하는 방향으로 이 문제를 풀어냄.
+
+이 문서의 관점에서 MRC는 “RDMA/RoCE가 실제 대규모 AI 클러스터에서 어디까지 확장되는가”를 보여주는 좋은 사례임. 다만 MRC 자체는 NIC, 스위치, 라우팅, congestion control이 함께 맞물리는 프로덕션 네트워크 설계이므로, 입문 단계에서는 **RoCE 위에서 multipath, packet spraying, source routing을 결합한 초대규모 학습용 확장 사례** 정도로 이해하면 충분함.
+
+---
+
+## References
 - *[RDMA Aware Networks Programming User Manual](https://docs.nvidia.com/rdma-aware-networks-programming-user-manual-1-7.pdf)* (NVIDIA/Mellanox 공식 PDF)
+- *[Supercomputer networking to accelerate large scale AI training](https://openai.com/index/mrc-supercomputer-networking/)* (OpenAI, 2026)
+- *[10만 GPU 시대의 네트워크, OpenAI가 직접 만든 MRC 프로토콜](https://wikidocs.net/blog/@jaehong/12991/)* (박재홍의 실리콘밸리, 2026)
