@@ -54,13 +54,15 @@ User Input
 
 ## Tokenization
 
-LLM은 문자열을 직접 처리하지 않고, 먼저 텍스트를 토큰 단위로 나눈다.
+LLM은 문자열을 직접 처리하지 않고, 먼저 텍스트를 토큰 단위로 나눈다. 이 appendix의 그림과 이어지는 self-attention 예시는 `"hello"`가 `["_hel", "lo"]` 두 토큰으로 나뉜다고 가정한다.
 
 ```text
-"What is the time?"
- → ["What", "is", "the", "time", "?"]
- → [1664, 318, 262, 640, 30]
+"hello"
+ → ["_hel", "lo"]
+ → [101, 102]
 ```
+
+위 token ID는 shape 설명을 위한 예시값이다. 실제 토큰 분할과 ID는 사용하는 tokenizer와 vocabulary에 따라 달라진다.
 
 Vocabulary size를 `V`라고 하면 각 token ID는 보통 다음 범위 안에 있다.
 
@@ -90,10 +92,10 @@ e_i = E[x_i]
 X \in \mathbb{R}^{n \times d_{model}}
 ```
 
-예를 들어 `seq_len = 5`, `d_model = 4096`이면 다음과 같다.
+그림의 작은 예시처럼 `seq_len = 2`, `d_model = 3`이면 다음과 같다.
 
 ```math
-X \in \mathbb{R}^{5 \times 4096}
+X \in \mathbb{R}^{2 \times 3}
 ```
 
 ## Positional Encoding과 RoPE
@@ -695,12 +697,12 @@ Logits는 아직 확률이 아니다.
 logit[token_id] = 해당 토큰이 다음에 나올 raw score
 ```
 
-예를 들어 `"What is the"` 다음 토큰 후보의 logit은 다음처럼 볼 수 있다.
+예를 들어 toy tokenizer에서 `"_hel"`이 화면에는 `"hel"`로 보인다고 하면, 현재 문맥 `["_hel"]` 다음 토큰 후보의 logit은 다음처럼 볼 수 있다.
 
 ```text
-time     logit = 5.2
-weather  logit = 3.1
-answer   logit = 1.7
+lo       logit = 5.2
+p        logit = 2.1
+met      logit = 0.7
 cat      logit = -2.0
 ```
 
@@ -783,26 +785,24 @@ Greedy는 sampling을 사실상 끈 deterministic 모드에 가깝다.
 선택된 token ID는 다시 텍스트로 변환된다.
 
 ```text
-token_id = 640
- → "time"
+token_id = 102
+ → "lo"
 ```
 
 이후 새 토큰을 기존 문맥에 추가한다.
 
 ```text
-"What is the"
- + "time"
- → "What is the time"
+["_hel"]
+ + ["lo"]
+ → ["_hel", "lo"]
+ → "hello"
 ```
 
 그리고 이 전체 문맥을 기반으로 다음 토큰을 다시 예측한다. 스트리밍 출력에서는 토큰이 생성되는 즉시 사용자에게 표시된다.
 
 ```text
-What
-What is
-What is the
-What is the time
-What is the time?
+"_hel" → "hel"
+"lo"   → "hello"
 ```
 
 ## Prefill과 Decode
