@@ -315,13 +315,13 @@ score_{10} & score_{11}
 \end{bmatrix}
 ```
 
-Mask 값으로 `0`이 아니라 `-\infty`를 쓰는 이유는 softmax 때문이다.
+Mask 값으로 `0`이 아니라 $-\infty$를 쓰는 이유는 softmax 때문이다.
 
 ```math
 softmax(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}
 ```
 
-막고 싶은 위치를 softmax 전에 `-\infty`로 만들면 다음과 같이 확률이 0이 된다.
+막고 싶은 위치를 softmax 전에 $-\infty$로 만들면 다음과 같이 확률이 0이 된다.
 
 ```math
 e^{-\infty} = 0
