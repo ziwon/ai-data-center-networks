@@ -32,6 +32,7 @@
   - [Random Spray](#random-spray)
   - [Selective Packet Spraying](#selective-packet-spraying)
   - [Packet Reordering](#packet-reordering)
+  - [MRC as a Modern Packet-Spraying Example](#mrc-as-a-modern-packet-spraying-example)
 - [Mechanism Comparison](#mechanism-comparison)
 - [Operational Validation Checklist](#operational-validation-checklist)
 - [Chapter Summary](#chapter-summary)
@@ -811,6 +812,43 @@ The practical rule:
 
 > Per-packet load balancing is powerful, but it should be enabled only where the transport, NIC, and workload semantics can handle the reordering.
 
+### MRC as a Modern Packet-Spraying Example
+
+OpenAI's MRC, Multipath Reliable Connection, is a recent example of packet spraying becoming part of the transport design rather than only a switch load-balancing mode.
+
+![MRC packet spraying compared with traditional single-path forwarding](assets/mrc-packet-spraying.svg)
+
+This is an original diagram based on OpenAI's MRC article and the MRC/SRv6 paper.
+
+Traditional ECMP usually keeps one flow or RDMA transfer on one path:
+
+```text
+One flow or transfer -> one path
+```
+
+This preserves ordering, but it also means a single elephant transfer can be trapped behind one path's bandwidth and congestion state.
+
+MRC changes the model:
+
+```text
+One RDMA transfer -> many packets -> many paths
+```
+
+MRC extends RoCE and sprays packets from a single transfer across many paths in a multi-plane network. Packets may arrive out of order, but MRC packets carry enough placement information for the destination to deliver data to the correct memory location. In other words, MRC treats out-of-order delivery as an expected transport behavior, not as an accidental side effect.
+
+The packet load-balancing view is:
+
+| Mechanism | Load-Balancing Unit | Main Benefit | Main Burden |
+| --- | --- | --- | --- |
+| Per-flow ECMP | Flow | Simple ordering | Elephant flow can be stuck on one path |
+| Flowlet DLB | Burst or flowlet | Better distribution with lower reordering risk | Inactivity timer must match the workload |
+| Per-packet spraying | Packet | High link utilization | Receiver must handle reordering |
+| MRC | Packets within one reliable transfer | One transfer can use many paths safely | Transport must handle placement, reliability, and path health |
+
+MRC also adapts away from congested or failed paths. If a path looks unhealthy, MRC can stop using it, retransmit affected data, and probe for recovery. It also uses packet trimming: when congestion would otherwise cause a drop, a switch can trim the payload and forward header information so the destination can request retransmission more explicitly.
+
+The practical takeaway is that MRC is not just "turning on per-packet mode." It combines packet spraying, out-of-order-safe delivery, multipath reliability, path failure handling, and congestion signaling into one transport-level design.
+
 ---
 
 ## Mechanism Comparison
@@ -899,6 +937,7 @@ The main takeaways:
 - TELB provides deterministic path control for tenants, jobs, GPUs, QPs, or port ranges.
 - Per-packet load balancing can maximize link utilization but requires careful handling of packet reordering.
 - Selective packet spraying is more practical than spraying all traffic because it can be limited to RDMA operations and NICs that support reordering.
+- MRC shows a modern transport-level approach where packet spraying, out-of-order-safe delivery, reliability, and path health are designed together.
 
 ---
 
@@ -919,6 +958,7 @@ The main takeaways:
 | Flowlet | A burst within a flow separated by an idle gap |
 | Inactivity timer | Timer used to decide whether the next burst can be reassigned |
 | Packet spraying | Sending packets from the same flow across multiple paths |
+| MRC | Multipath Reliable Connection; OpenAI's RoCE-based transport that sprays packets across many paths and handles placement, reliability, and path health |
 | RoCEv2 BTH | RoCEv2 Base Transport Header |
 | QP | RDMA Queue Pair |
 | TCAM | Ternary Content-Addressable Memory used for fast match rules |
@@ -1056,6 +1096,8 @@ The practical answer is to start simple, measure, and then add sophistication wh
 - [NVIDIA Onyx: IP Routing Overview](https://docs.nvidia.com/networking/display/onyxv31040100/ip+routing+overview)
 - [NVIDIA QM97xx Quantum-2 NDR InfiniBand Switch Platform Introduction](https://docs.nvidia.com/networking/display/QM97X0PUB/Introduction)
 - [NVIDIA RoCE Documentation](https://docs.nvidia.com/networking/display/MLNXOFEDv23103220lts/RDMA+over+Converged+Ethernet+(RoCE))
+- [OpenAI: Supercomputer networking to accelerate large scale AI training](https://openai.com/index/mrc-supercomputer-networking/)
+- [OpenAI: Resilient AI Supercomputer Networking using MRC and SRv6](https://cdn.openai.com/pdf/resilient-ai-supercomputer-networking-using-mrc-and-srv6.pdf)
 - [P4 Portable Switch Architecture Specification](https://p4lang.github.io/p4-spec/docs/PSA-v1.0.0.html)
 - [P4-16 Language Specification](https://p4.org/p4-spec/docs/P4-16-v1.0.0-spec.html)
 - [Ultra Ethernet Consortium](https://ultraethernet.org/)
