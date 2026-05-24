@@ -1,0 +1,226 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+topology := "clos.clab.yml"
+lab      := "clos-ebgp"
+prefix   := "clab-" + lab + "-"
+
+spines := "spine1 spine2"
+leaves := "leaf1 leaf2 leaf3 leaf4"
+hosts  := "host1 host2 host3 host4"
+
+_default:
+    @just --list --unsorted
+
+# pull container images used by the lab
+pull:
+    docker pull quay.io/frrouting/frr:9.1.0
+    docker pull nicolaka/netshoot:latest
+
+# deploy the lab (idempotent; use `redeploy` to force a fresh start)
+deploy:
+    sudo containerlab deploy -t {{topology}}
+
+# destroy the lab and clean residual netns/bridges
+destroy:
+    sudo containerlab destroy -t {{topology}} --cleanup
+
+# destroy + deploy
+redeploy: destroy deploy
+
+# clab inspect (nodes, mgmt IPs, state)
+status:
+    sudo containerlab inspect -t {{topology}}
+
+# render topology PNG via clab graph
+graph:
+    sudo containerlab graph -t {{topology}}
+
+# wait for BGP to converge (default 25s; override with `just wait 40`)
+wait seconds="25":
+    @echo "waiting {{seconds}}s for BGP convergence..."
+    @sleep {{seconds}}
+
+# end-to-end verification: BGP up, ECMP installed, AS_PATH, host pings
+verify:
+    sudo bash scripts/verify.sh
+
+# link/node failure scenarios with background ping for loss%
+failure-test:
+    sudo bash scripts/failure-test.sh
+
+# full cycle: pull -> deploy -> wait -> verify
+up: pull deploy (wait "25") verify
+
+# vtysh shell on a router (e.g. `just vtysh leaf1`)
+vtysh node:
+    docker exec -it {{prefix}}{{node}} vtysh
+
+# shell inside any container (e.g. `just sh host1` or `just sh spine1`)
+sh node:
+    docker exec -it {{prefix}}{{node}} bash 2>/dev/null || docker exec -it {{prefix}}{{node}} sh
+
+# run a vtysh command on a router (e.g. `just vc leaf1 "show ip route"`)
+vc node cmd:
+    docker exec {{prefix}}{{node}} vtysh -c "{{cmd}}"
+
+# BGP summary on every router
+bgp-summary:
+    @for n in {{spines}} {{leaves}}; do \
+        printf "\n\033[1;36m=== $n ===\033[0m\n"; \
+        docker exec {{prefix}}$n vtysh -c "show bgp ipv4 unicast summary"; \
+    done
+
+# count of BGP-installed routes per leaf (sanity gauge after convergence)
+route-count:
+    @for n in {{leaves}}; do \
+        c=$(docker exec {{prefix}}$n vtysh -c "show ip route bgp" | grep -c '^B>' || true); \
+        printf "%-8s %s BGP routes\n" "$n" "$c"; \
+    done
+
+# routing table on a node (e.g. `just routes leaf1`)
+routes node:
+    docker exec {{prefix}}{{node}} vtysh -c "show ip route"
+
+# show a specific prefix in the BGP table (e.g. `just bgp leaf1 10.0.0.13/32`)
+bgp node route_prefix:
+    docker exec {{prefix}}{{node}} vtysh -c "show bgp ipv4 unicast {{route_prefix}}"
+
+# ECMP sanity: routes from leaf1 to every other leaf's loopback (expect 2 next-hops each)
+ecmp:
+    @for lb in 10.0.0.12 10.0.0.13 10.0.0.14; do \
+        printf "\n\033[1;36m=== leaf1 -> $lb ===\033[0m\n"; \
+        docker exec {{prefix}}leaf1 vtysh -c "show ip route $lb/32"; \
+    done
+
+# ping between host containers (e.g. `just ping host1 host3`)
+ping src dst:
+    @declare -A IP=([host1]=10.11.0.10 [host2]=10.12.0.10 [host3]=10.13.0.10 [host4]=10.14.0.10); \
+    docker exec {{prefix}}{{src}} ping -c 4 -W 2 ${IP[{{dst}}]}
+
+# traceroute between hosts (run twice to observe ECMP path variance)
+trace src dst:
+    @declare -A IP=([host1]=10.11.0.10 [host2]=10.12.0.10 [host3]=10.13.0.10 [host4]=10.14.0.10); \
+    docker exec {{prefix}}{{src}} traceroute -n -q 1 ${IP[{{dst}}]}
+
+# full mesh host-to-host ping matrix
+ping-mesh:
+    @declare -A IP=([host1]=10.11.0.10 [host2]=10.12.0.10 [host3]=10.13.0.10 [host4]=10.14.0.10); \
+    for s in {{hosts}}; do for d in {{hosts}}; do \
+        [ "$s" = "$d" ] && continue; \
+        printf "%-6s -> %-6s " "$s" "$d"; \
+        docker exec {{prefix}}$s ping -c 1 -W 1 ${IP[$d]} >/dev/null 2>&1 \
+            && echo OK || echo FAIL; \
+    done; done
+
+# iperf3 single-flow throughput host1 -> host3 (shows ECMP polarization)
+iperf-single:
+    docker exec -d {{prefix}}host3 iperf3 -s -1
+    @sleep 1
+    docker exec {{prefix}}host1 iperf3 -c 10.13.0.10 -t 10 -P 1
+
+# iperf3 with 8 parallel flows host1 -> host3 (should spread across uplinks)
+iperf-parallel:
+    docker exec -d {{prefix}}host3 iperf3 -s -1
+    @sleep 1
+    docker exec {{prefix}}host1 iperf3 -c 10.13.0.10 -t 10 -P 8
+
+# tail FRR logs for a node (Ctrl-C to stop)
+logs node:
+    docker logs -f {{prefix}}{{node}}
+
+# tcpdump on an interface inside a node (e.g. `just tcpdump leaf1 eth1`)
+tcpdump node iface:
+    docker exec -it {{prefix}}{{node}} tcpdump -nni {{iface}}
+
+# interface counters on a leaf's uplinks (handy during iperf to spot ECMP polarization)
+counters node="leaf1":
+    docker exec {{prefix}}{{node}} ip -s link show eth1
+    docker exec {{prefix}}{{node}} ip -s link show eth2
+
+# reload FRR config inside a router after editing configs/<node>/frr.conf on the host
+reload node:
+    docker exec {{prefix}}{{node}} vtysh -c "configure terminal" -c "end" -c "write memory"
+    docker kill -s HUP {{prefix}}{{node}}
+
+# validate the topology YAML without deploying
+lint:
+    sudo containerlab inspect -t {{topology}} --format json >/dev/null
+    @echo "topology parses OK"
+
+# remove the clab state dir + topology data (only safe after `destroy`)
+clean:
+    sudo rm -rf clab-{{lab}} .clab.yml.bak
+
+# Exercise 1: enable BFD on every BGP session (runtime-only; gone after redeploy)
+bfd-on:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    apply() { docker exec -i {{prefix}}"$1" vtysh; }
+    bfd_peer() {
+        local p=$1
+        printf ' peer %s\n  receive-interval 100\n  transmit-interval 100\n  detect-multiplier 3\n  no shutdown\n exit\n' "$p"
+    }
+    for i in 1 2 3 4; do
+        {
+            echo "configure terminal"
+            echo "bfd"
+            bfd_peer "10.$i.1.1"
+            bfd_peer "10.$i.2.1"
+            echo "exit"
+            echo "router bgp $((65010 + i))"
+            echo " neighbor 10.$i.1.1 bfd"
+            echo " neighbor 10.$i.2.1 bfd"
+            echo "end"
+        } | apply leaf$i
+    done
+    for s in 1 2; do
+        {
+            echo "configure terminal"
+            echo "bfd"
+            for i in 1 2 3 4; do bfd_peer "10.$i.$s.0"; done
+            echo "exit"
+            echo "router bgp $((64999 + s))"
+            for i in 1 2 3 4; do echo " neighbor 10.$i.$s.0 bfd"; done
+            echo "end"
+        } | apply spine$s
+    done
+    echo
+    echo "BFD enabled. Verify with 'just bfd-status', then 'just failure-test' to compare loss."
+
+# disable BFD on every BGP session
+bfd-off:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    apply() { docker exec -i {{prefix}}"$1" vtysh; }
+    for i in 1 2 3 4; do
+        {
+            echo "configure terminal"
+            echo "router bgp $((65010 + i))"
+            echo " no neighbor 10.$i.1.1 bfd"
+            echo " no neighbor 10.$i.2.1 bfd"
+            echo "exit"
+            echo "bfd"
+            echo " no peer 10.$i.1.1"
+            echo " no peer 10.$i.2.1"
+            echo "end"
+        } | apply leaf$i
+    done
+    for s in 1 2; do
+        {
+            echo "configure terminal"
+            echo "router bgp $((64999 + s))"
+            for i in 1 2 3 4; do echo " no neighbor 10.$i.$s.0 bfd"; done
+            echo "exit"
+            echo "bfd"
+            for i in 1 2 3 4; do echo " no peer 10.$i.$s.0"; done
+            echo "end"
+        } | apply spine$s
+    done
+    echo "BFD disabled."
+
+# show BFD peer status on every router
+bfd-status:
+    @for n in {{spines}} {{leaves}}; do \
+        printf "\n\033[1;36m=== $n ===\033[0m\n"; \
+        docker exec {{prefix}}$n vtysh -c "show bfd peers brief" 2>/dev/null || echo "(bfdd not running?)"; \
+    done

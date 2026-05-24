@@ -1,0 +1,183 @@
+# clos-ebgp-lab: 2-spine x 4-leaf Clos with eBGP underlay (RFC 7938)
+#
+# IP plan
+#   Loopbacks (/32):
+#     spine1=10.0.0.101, spine2=10.0.0.102
+#     leaf1=10.0.0.11,   leaf2=10.0.0.12
+#     leaf3=10.0.0.13,   leaf4=10.0.0.14
+#
+#   P2P links (/31), per leaf:
+#     leaf1<->spine1: 10.1.1.0/31  (leaf .0, spine .1)
+#     leaf1<->spine2: 10.1.2.0/31
+#     leaf2<->spine1: 10.2.1.0/31
+#     leaf2<->spine2: 10.2.2.0/31
+#     leaf3<->spine1: 10.3.1.0/31
+#     leaf3<->spine2: 10.3.2.0/31
+#     leaf4<->spine1: 10.4.1.0/31
+#     leaf4<->spine2: 10.4.2.0/31
+#
+#   Host networks (advertised by each leaf):
+#     leaf1 -> 10.11.0.0/24, host1 = 10.11.0.10
+#     leaf2 -> 10.12.0.0/24, host2 = 10.12.0.10
+#     leaf3 -> 10.13.0.0/24, host3 = 10.13.0.10
+#     leaf4 -> 10.14.0.0/24, host4 = 10.14.0.10
+#
+#   ASNs (private 2-byte, per RFC 6996):
+#     spine1=65000, spine2=65001
+#     leaf1=65011, leaf2=65012, leaf3=65013, leaf4=65014
+
+name: clos-ebgp
+
+mgmt:
+  network: clab-clos-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  kinds:
+    linux:
+      image: quay.io/frrouting/frr:9.1.0
+    host:
+      image: nicolaka/netshoot:latest
+
+  nodes:
+    # ---------- Spines ----------
+    spine1:
+      kind: linux
+      mgmt-ipv4: 172.20.20.101
+      binds:
+        - configs/spine1/frr.conf:/etc/frr/frr.conf
+        - configs/spine1/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - ip link set dev lo up
+        - ip addr add 10.0.0.101/32 dev lo
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+
+    spine2:
+      kind: linux
+      mgmt-ipv4: 172.20.20.102
+      binds:
+        - configs/spine2/frr.conf:/etc/frr/frr.conf
+        - configs/spine2/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - ip link set dev lo up
+        - ip addr add 10.0.0.102/32 dev lo
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+
+    # ---------- Leaves ----------
+    leaf1:
+      kind: linux
+      mgmt-ipv4: 172.20.20.11
+      binds:
+        - configs/leaf1/frr.conf:/etc/frr/frr.conf
+        - configs/leaf1/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - ip link set dev lo up
+        - ip addr add 10.0.0.11/32 dev lo
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+
+    leaf2:
+      kind: linux
+      mgmt-ipv4: 172.20.20.12
+      binds:
+        - configs/leaf2/frr.conf:/etc/frr/frr.conf
+        - configs/leaf2/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - ip link set dev lo up
+        - ip addr add 10.0.0.12/32 dev lo
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+
+    leaf3:
+      kind: linux
+      mgmt-ipv4: 172.20.20.13
+      binds:
+        - configs/leaf3/frr.conf:/etc/frr/frr.conf
+        - configs/leaf3/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - ip link set dev lo up
+        - ip addr add 10.0.0.13/32 dev lo
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+
+    leaf4:
+      kind: linux
+      mgmt-ipv4: 172.20.20.14
+      binds:
+        - configs/leaf4/frr.conf:/etc/frr/frr.conf
+        - configs/leaf4/daemons:/etc/frr/daemons
+        - configs/vtysh.conf:/etc/frr/vtysh.conf
+      exec:
+        - ip link set dev lo up
+        - ip addr add 10.0.0.14/32 dev lo
+        - sysctl -w net.ipv4.ip_forward=1
+        - sysctl -w net.ipv4.conf.all.rp_filter=0
+        - sysctl -w net.ipv6.conf.all.disable_ipv6=1
+
+    # ---------- Hosts (one per leaf) ----------
+    host1:
+      kind: linux
+      image: nicolaka/netshoot:latest
+      mgmt-ipv4: 172.20.20.211
+      exec:
+        - ip addr add 10.11.0.10/24 dev eth1
+        - ip link set dev eth1 up
+        - ip route replace default via 10.11.0.1
+
+    host2:
+      kind: linux
+      image: nicolaka/netshoot:latest
+      mgmt-ipv4: 172.20.20.212
+      exec:
+        - ip addr add 10.12.0.10/24 dev eth1
+        - ip link set dev eth1 up
+        - ip route replace default via 10.12.0.1
+
+    host3:
+      kind: linux
+      image: nicolaka/netshoot:latest
+      mgmt-ipv4: 172.20.20.213
+      exec:
+        - ip addr add 10.13.0.10/24 dev eth1
+        - ip link set dev eth1 up
+        - ip route replace default via 10.13.0.1
+
+    host4:
+      kind: linux
+      image: nicolaka/netshoot:latest
+      mgmt-ipv4: 172.20.20.214
+      exec:
+        - ip addr add 10.14.0.10/24 dev eth1
+        - ip link set dev eth1 up
+        - ip route replace default via 10.14.0.1
+
+  links:
+    # --- leaf1 fabric uplinks ---
+    - endpoints: ["leaf1:eth1", "spine1:eth1"]   # 10.1.1.0/31
+    - endpoints: ["leaf1:eth2", "spine2:eth1"]   # 10.1.2.0/31
+    # --- leaf2 fabric uplinks ---
+    - endpoints: ["leaf2:eth1", "spine1:eth2"]   # 10.2.1.0/31
+    - endpoints: ["leaf2:eth2", "spine2:eth2"]   # 10.2.2.0/31
+    # --- leaf3 fabric uplinks ---
+    - endpoints: ["leaf3:eth1", "spine1:eth3"]   # 10.3.1.0/31
+    - endpoints: ["leaf3:eth2", "spine2:eth3"]   # 10.3.2.0/31
+    # --- leaf4 fabric uplinks ---
+    - endpoints: ["leaf4:eth1", "spine1:eth4"]   # 10.4.1.0/31
+    - endpoints: ["leaf4:eth2", "spine2:eth4"]   # 10.4.2.0/31
+    # --- host attachments (eth9 on leaf) ---
+    - endpoints: ["leaf1:eth9", "host1:eth1"]
+    - endpoints: ["leaf2:eth9", "host2:eth1"]
+    - endpoints: ["leaf3:eth9", "host3:eth1"]
+    - endpoints: ["leaf4:eth9", "host4:eth1"]
