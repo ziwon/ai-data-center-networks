@@ -272,7 +272,9 @@ The chapter compares several mechanisms:
 
 ![Proactive load balancing and reactive congestion management](assets/proactive-load-balancing-vs-reactive-congestion.svg)
 
-Juniper's elephant-flow discussion separates the problem into proactive and reactive controls. Load balancing is proactive: it tries to keep elephant flows from piling onto the same path. Congestion management is reactive: ECN, PFC, and DCQCN respond when queues already show congestion.
+Juniper's elephant-flow discussion separates the problem into proactive and reactive controls. Proactive mechanisms try to avoid congestion before it forms by choosing better paths for flows, flowlets, or selected packets. Reactive mechanisms respond after queues begin to build by marking, pausing, or slowing traffic.
+
+In this model, SLB, DLB, DLB v2, GLB, TELB, and selective packet spraying are mainly proactive load-balancing tools. ECN, PFC, and DCQCN are reactive congestion-management tools. A RoCEv2 fabric usually needs both: proactive path selection to reduce hot spots, and reactive congestion control to protect loss-sensitive RDMA traffic when queues still build.
 
 ![AI fabric load-balancing mechanism pyramid](assets/load-balancing-pyramid.svg)
 
