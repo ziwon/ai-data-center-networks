@@ -8,3 +8,23 @@
 
 - [LLM Inference](appendix/llm-inference/README.md)
 - [Transformer](appendix/transformer/README.md)
+
+## Resources
+
+### Books
+
+- [Efficient LLM Inference Systems, Algorithms & Production Engineering - Interview Pocket Notes](https://drive.google.com/file/d/1mfTzOnwn8yx4eKObjPvpd-B_toGkQ_tu/view) (2026)
+- [Build a Large Language Model (From Scratch)](https://github.com/rasbt/LLMs-from-scratch)
+
+### Papers
+
+- [Splitwise: Efficient generative LLM inference using phase splitting](https://arxiv.org/abs/2311.18677) (2023.11)
+- [Efficiently Scaling Transformer Inference](https://arxiv.org/abs/2211.05102) (2022.11)
+- [LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale](https://arxiv.org/abs/2208.07339) (2022.08)
+- [Scaling Laws for Neural Language Models](https://arxiv.org/abs/2001.08361) (2020.01)
+
+### LLM Architecture
+
+- [LLM Architecture Gallery](https://sebastianraschka.com/llm-architecture-gallery/)
+- [The Big LLM Architecture Comparison](https://www.youtube.com/watch?v=rNlULI-zGcw)
+- [The Big LLM Architecture Comparison Blog](https://magazine.sebastianraschka.com/p/the-big-llm-architecture-comparison)

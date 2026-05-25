@@ -1,5 +1,6 @@
-# ai-data-center-network
-AI Data Center Network 참여형 스터디 자료 모음
+# AI Data Center Systems
+
+AI data center networking, LLM inference, storage, and AI systems performance engineering study notes.
 
 <p align="center">
 <img width="1024" height="341" alt="ai-datacenter-networks" src="https://github.com/user-attachments/assets/48ff6793-1d84-47d6-9b7c-7c11c233271d" />
@@ -7,73 +8,15 @@ AI Data Center Network 참여형 스터디 자료 모음
 
 ## Study Tracks
 
-- [AI Data Center Network](./ai-data-center-network/README.md)
-- [Efficient LLM Inference Systems](./efficient-llm-inference-systems/README.md)
-- [AI Systems Performance Engineering](./ai-system-performance-engineering/README.md)
-- [Storage](./storage/README.md)
+| Track | Description |
+| --- | --- |
+| [AI Data Center Network](./ai-data-center-network/README.md) | AI 데이터센터 네트워크, RDMA, InfiniBand, RoCE, Clos fabric |
+| [Efficient LLM Inference Systems](./efficient-llm-inference-systems/README.md) | LLM inference 성능, KV cache, batching, GPU profiling |
+| [AI Systems Performance Engineering](./ai-system-performance-engineering/README.md) | GPU, CUDA, PyTorch 기반 AI 시스템 성능 엔지니어링 |
+| [Storage](./storage/README.md) | AI workload storage, ZFS, checkpoint/data pipeline |
 
-## Books
-- [AI Data Center Network Design and Technologie](https://www.amazon.com/Data-Center-Network-Design-Technologies/dp/0135436281) (2026.02)
-- [Deep Learning for Network Engineers: Understanding Traffic Patterns and Network Requirements in the AI Data Center](https://www.amazon.com/Deep-Learning-Network-Engineers-Understanding/dp/B0F8ZV7SKD) (2026.05)
-- [AI Systems Performance Engineering: Optimizing Model Training and Inference Workloads with GPUs, CUDA, and PyTorch](https://www.amazon.com/Systems-Performance-Engineering-Optimizing-Inference/dp/B0F47689K8) (2025.12)
-  - [Code](https://github.com/cfregly/ai-performance-engineering)   
-- [Efficient LLM Inference Systems, Algorithms & Production Engineering - Interview Pocket Notes](https://drive.google.com/file/d/1mfTzOnwn8yx4eKObjPvpd-B_toGkQ_tu/view) (2026)
-- [Build a Large Language Model (From Scratch)](https://github.com/rasbt/LLMs-from-scratch)
-- [InfiniBand Network Architecture](https://learning.oreilly.com/library/view/infiniband-network-architecture/0321117654/) (2022.10)
+## Labs
 
-## Articles
-- [InfiniBand vs RoCEv2 실측 비교 — 대규모 AI 학습 클러스터의 네트워크 선택](https://elice.io/ko/resources/blog/infiniband-vs-rocev2-benchmark) (2026.04)
-- [DGX B300 ConnectX-8 기반 800G 네트워크에서 소규모 클러스터를 스위치 없이 구성하는 방법](https://blog.sionic.ai/dgx-b300-direct) (2026.04)
-- [A Practical Guide to RoCEv2 Lossless Networks for GPU Clusters](https://www.aicplight.com/blog-news/a-practical-guide-to-rocev2-lossless-networks-for-gpu-clusters-230) (2026.04)
-- [InfiniBand Is Losing the Fabric War. Here’s What That Changes for Your Architecture.](https://www.rack2cloud.com/infiniband-vs-rocev2-ai-fabric/) (2026.03)
-- [From Megawatts to Gigawatts: The 10 Largest AI Datacenters in the World (2026 Edition)](https://www.terakraft.no/post/from-megawatts-to-gigawatts-the-10-largest-ai-datacenters-in-the-world-2026-edition) (2026.01)
-- [AI Data Center Network with Juniper Apstra, AMD GPUs, Broadcom Thor2 NIC, AMD Pollara NIC, and Vast Storage—Juniper Validated Design (JVD)](https://www.juniper.net/documentation/us/en/software/jvd/jvd-ai-dc-apstra-amd/solution_architecture.html) (2025.11)
-- [Cisco Data Center Networking Solutions: Addressing the Challenges of AI/ML Infrastructure](https://www.cisco.com/c/en/us/td/docs/dcn/whitepapers/cisco-addressing-ai-ml-network-challenges.html) (2025.10)
-- [InfiniBand vs RoCEv2: Choosing the Right Network for Large-Scale AI](https://towardsdatascience.com/infiniband-vs-rocev2-choosing-the-right-network-for-large-scale-ai/) (2025.08)
-- [Data center design requirements for AI workloads. A Comprenshive guide](https://www.terakraft.no/post/datacenter-design-requirements-for-ai-workloads-a-comprenshive-guide)
-- [RoCE networks for distributed AI training at scale](https://engineering.fb.com/2024/08/05/data-center-engineering/roce-network-distributed-ai-training-at-scale/) (2024.08)
-- [Cisco Data Center Networking Blueprint for AI/ML Applications](https://www.cisco.com/c/en/us/td/docs/dcn/whitepapers/cisco-data-center-networking-blueprint-for-ai-ml-applications.html)
-- [Network Best Practices for Artificial Intelligence Data Centre](https://www.ciscolive.com/c/dam/r/ciscolive/emea/docs/2024/pdf/BRKDCN-2921.pdf) (2024)
-- [How to Choose Between InfiniBand and RoCEv2](https://www.fibermall.com/blog/how-to-choose-between-infiniband-and-roce.htm) (2024.07)
-- **[Making Deep Learning Go Brrrr From First Principles](https://horace.io/brrr_intro.html)**
-- [Managing the Elephant in the Room for AI Data Centers](https://blogs.juniper.net/en-us/industry-solutions-and-trends/managing-the-elephant-in-the-room-for-ai-data-centers) (2024.03)
-
-## Talks
-- [The Engineering Behind Training a 2 Trillion Parameter LLM](https://www.youtube.com/watch?v=yn4GGAtZ7QE) (2026.04)
-- [AI 네트워크 아키텍처 완벽 정리: InfiniBand vs Ultra Ethernet 기술 비교](https://www.youtube.com/watch?v=PPdY5q8osSA) (2026.01)
-- [Everything You Wanted to Know About RDMA](https://www.youtube.com/watch?v=6t041Lr5FCY) (2025)
-
-## Papers
-- [Splitwise: Efficient generative LLM inference using phase splitting](https://arxiv.org/abs/2311.18677) (2023.11)
-- **[Efficiently Scaling Transformer Inference](https://arxiv.org/abs/2211.05102)** (2022.11)
-- [LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale](https://arxiv.org/abs/2208.07339) (2022.08)
-- [Scaling Laws for Neural Language Models](https://arxiv.org/abs/2001.08361) (2020.01)
-
-## GPU
-- [H100 Tensor Core GPU Architecture](https://resources.nvidia.com/en-us-hopper-architecture/nvidia-h100-tensor-c)
-- [NVIDIA Blackwell Architecture Technical Brief](https://resources.nvidia.com/en-us-blackwell-architecture)
-  - [NVFP4 Trains with Precision of 16-Bit and Speed and Efficiency of 4-Bit](https://developer.nvidia.com/blog/nvfp4-trains-with-precision-of-16-bit-and-speed-and-efficiency-of-4-bit/?ncid=no-ncid) (2025.08)
-  - [Using FP8 and FP4 with Transformer Engine](https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/examples/fp8_primer.html)
-- [NCCL and Communication Collectives](https://roycho96.github.io/posts/nccl-collectives/)
-- [NCCL Algorithms](https://roycho96.github.io/posts/nccl-algorithms/)
-
-## LLM Arch
-- [LLM Architecture Gallery](https://sebastianraschka.com/llm-architecture-gallery/)
-  - [The Big LLM Architecture Comparison](https://www.youtube.com/watch?v=rNlULI-zGcw), [Blog](https://magazine.sebastianraschka.com/p/the-big-llm-architecture-comparison)
-
-## Models & Training
-- [Unsloth](https://unsloth.ai/docs/models/tutorials)
-  - [Nemotron-3 Nano Omni](https://unsloth.ai/docs/models/nemotron-3-nano-omni)
-  - [Qwen3.6](https://unsloth.ai/docs/models/qwen3.6)
-  - [Qwen3.5](https://unsloth.ai/docs/models/qwen3.5)
-  - [Qwen3-VL](https://unsloth.ai/docs/basics/vision-fine-tuning)
-  - [Fine-tuning LLMs Guide](https://unsloth.ai/docs/get-started/fine-tuning-llms-guide)
-- [Ray](https://docs.ray.io/en/latest/ray-overview/index.html)
-  - [Train](https://docs.ray.io/en/latest/train/examples.html) 
-
-## Cable & Data Center
-- https://www.submarinecablemap.com/
-- https://opengridworks.com
-
-## Links
-- [http://blog.cloudneta.net/](http://blog.cloudneta.net/)
+- [Clos Fabric Lab Series](./ai-data-center-network/clos-ebgp-lab/README.md)
+- [InfiniBand Packet Analysis](./ai-data-center-network/ib-packet-analysis/README.md)
+- [RDMA Read/Write Examples](./ai-data-center-network/rdma-examples/README.md)
