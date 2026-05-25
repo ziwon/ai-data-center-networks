@@ -5,6 +5,13 @@ AI Data Center Network 참여형 스터디 자료 모음
 <img width="1024" height="341" alt="ai-datacenter-networks" src="https://github.com/user-attachments/assets/48ff6793-1d84-47d6-9b7c-7c11c233271d" />
 </p>
 
+## Study Tracks
+
+- [AI Data Center Network](./ai-data-center-network/README.md)
+- [Efficient LLM Inference Systems](./efficient-llm-inference-systems/README.md)
+- [AI Systems Performance Engineering](./ai-system-performance-engineering/README.md)
+- [Storage](./storage/README.md)
+
 ## Books
 - [AI Data Center Network Design and Technologie](https://www.amazon.com/Data-Center-Network-Design-Technologies/dp/0135436281) (2026.02)
 - [Deep Learning for Network Engineers: Understanding Traffic Patterns and Network Requirements in the AI Data Center](https://www.amazon.com/Deep-Learning-Network-Engineers-Understanding/dp/B0F8ZV7SKD) (2026.05)
