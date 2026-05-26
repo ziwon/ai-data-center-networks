@@ -1,6 +1,7 @@
 # AI Systems Performance Engineering
 
 - [Chapter 1: Introduction and AI System Overview](./chap01/README.md)
+- [Chapter 2: AI System Hardware Overview](./chap02/README.md)
 
 ## Resources
 
