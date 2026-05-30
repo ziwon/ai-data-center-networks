@@ -40,6 +40,54 @@ xmllint --noout path/to/file.svg
 git diff --check
 ```
 
+## Mermaid Diagram Style
+
+When creating or updating Mermaid diagrams in repository READMEs, apply the same editorial diagram style used for SVGs. Mermaid diagrams should feel like lightweight technical figures, not colorful slide graphics.
+
+### Mermaid Palette
+
+Use the shared palette through `classDef` declarations inside each Mermaid block:
+
+```mermaid
+flowchart LR
+    A[Primary concept] --> B[Intermediate step]
+    B --> C[Critical output]
+    B --> D[Secondary note]
+
+    classDef primary fill:#F5F1EA,stroke:#111111,stroke-width:1.4px,color:#050505
+    classDef secondary fill:#F3EFE7,stroke:#D8D1C7,stroke-width:1.2px,color:#050505
+    classDef note fill:#F5F1EA,stroke:#D8D1C7,stroke-width:1px,color:#6F6A63
+    classDef accent fill:#F5F1EA,stroke:#D9392E,stroke-width:2px,color:#050505
+    class A primary
+    class B secondary
+    class C accent
+    class D note
+```
+
+### Mermaid Layout
+
+- Prefer `flowchart LR` for pipelines and generation flows; prefer `flowchart TB` for taxonomies, prompt structures, and stacked model families.
+- Keep node labels short. Use `<br/>` for a controlled second line instead of long single-line labels.
+- Use `primary` for the input, root concept, or final core object.
+- Use `secondary` for ordinary processing steps.
+- Use `note` for examples, caveats, side outputs, or supporting details.
+- Use `accent` sparingly for the critical path, bottleneck, selected expert, final selected answer, unsafe/invalid path, or main trade-off.
+- Avoid more than four visual classes in a Mermaid block unless the local diagram genuinely needs more.
+- Do not use Mermaid theme directives, gradients, icons, emojis, or multicolor class palettes unless a local file already established that style.
+- Keep arrows simple. Use dashed arrows only for feedback loops, optional links, or explanatory references.
+
+### Mermaid Implementation
+
+- Put `classDef` declarations inside each Mermaid block so the diagram remains portable when copied into another README.
+- Reuse class names consistently: `primary`, `secondary`, `note`, `accent`.
+- Assign classes explicitly with `class ...` lines rather than relying on default Mermaid styling.
+- For lecture notes, prefer Mermaid for conceptual flow and taxonomy diagrams; use hand-editable SVG for dense architecture, matrix, cache, or routing diagrams where precise alignment matters.
+- Before finishing, run:
+
+```bash
+git diff --check
+```
+
 ## Practical Tips and Notes Sections
 
 When adding a `Practical Tips and Notes` section to a chapter README, keep it clearly separate from the book summary.
