@@ -150,9 +150,9 @@ Tokenization 방식은 여러 가지다.
 
 ```mermaid
 flowchart TB
-    T["A cute teddy bear is reading"] --> W[Word-level<br/>A | cute | teddy | bear | is | reading]
-    T --> S[Subword-level<br/>A | cute | teddy | bear | is | read | ##ing]
-    T --> C[Character-level<br/>A | c | u | t | e | ...]
+    T["A cute teddy bear is reading"] --> W["Word-level<br/>A / cute / teddy / bear / is / reading"]
+    T --> S["Subword-level<br/>A / cute / teddy / bear / is / read / ##ing"]
+    T --> C["Character-level<br/>A / c / u / t / e / ..."]
     W --> WN[shorter sequence<br/>higher OOV risk]
     S --> SN[balanced default<br/>lower OOV risk]
     C --> CN[robust spelling<br/>long sequence]
