@@ -139,6 +139,8 @@ h1 {
   font-size: 27px;
   font-weight: 600;
 }
+.meta a { color: inherit; text-decoration: none; }
+.meta a:hover b { color: var(--quiet-cyan); }
 
 .s-head { display: flex; align-items: center; gap: 22px; }
 .s-title {
