@@ -91,7 +91,7 @@ BERT는 문장이나 문서를 좋은 embedding으로 encode하는 데 강하지
 Language model은 token sequence에 probability를 부여하는 model이다. Decoder-only LLM은 다음 token의 conditional probability를 반복적으로 계산한다.
 
 ```math
-P(x_1, x_2, ..., x_T) = \prod_{t=1}^{T} P(x_t | x_{<t})
+P(x_1, x_2, ..., x_T) = \prod_{t=1}^{T} P(x_t | x_{\lt t})
 ```
 
 LLM이 "large"하다는 말은 보통 세 가지 차원을 포함한다.
@@ -298,7 +298,7 @@ BOS
 Sequence probability는 token probability의 곱이고, log space에서는 log probability의 합으로 계산한다.
 
 ```math
-\log P(x_{1:T}) = \sum_{t=1}^{T} \log P(x_t | x_{<t})
+\log P(x_{1:T}) = \sum_{t=1}^{T} \log P(x_t | x_{\lt t})
 ```
 
 Beam search는 greedy보다 전체 sequence 관점에 가깝지만, 계산량이 크고 diversity가 낮다. 또한 probability를 계속 곱하면 긴 sequence일수록 score가 작아져 shorter output을 선호하는 문제가 생긴다. 그래서 length penalty 같은 보정이 필요하다.
