@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DGX B200 Networking in Practice · QuietFabric</title>
+<link rel="stylesheet" href="deck.css">
+</head>
+<body>
+<button id="themeToggle" type="button"><span class="dot"></span><span id="themeLabel">dark</span></button>
+
+<deck-stage width="1920" height="1080">
+  <section data-label="Cover">
+    <div class="slide glow cover">
+      <div>
+        <div class="eyebrow">DGX B200 · GPU fabric operations</div>
+        <h1>From book theory<br>to real DGX B200 operations.</h1>
+        <p class="lead">InfiniBand, SR-IOV, RDMA, and Kubernetes GPU networking lessons from an 8-node DGX B200 cluster.</p>
+        <div class="meta">
+          <div><b>8 DGX B200</b>cluster scale</div>
+          <div><b>400G IB</b>scale-out fabric</div>
+          <div><b>K8s + RDMA</b>workload plane</div>
+          <div><b>github.com/ziwon</b>author</div>
+        </div>
+      </div>
+      <div class="route" style="padding:56px 44px">
+        <div class="track" style="flex-direction:column;gap:22px">
+          <div class="node"><div class="nm">GPU / NVSwitch</div><div class="mt">scale-up inside each DGX</div></div>
+          <div class="node"><div class="nm">ConnectX-7 / BlueField-3</div><div class="mt">PF · VF · RDMA device</div></div>
+          <div class="node"><div class="nm">Quantum IB fabric</div><div class="mt">QM9700 / QM8700 · SM · LID · GUID</div></div>
+          <div class="node"><div class="nm">Kubernetes Pod</div><div class="mt">Cilium · Multus · SR-IOV CNI</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-label="Agenda">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">storyline</span><span class="pill" style="margin-left:auto"><span class="ind"></span>20 min</span></div>
+        <div class="s-title">이 발표는 “GPU fabric을 어떻게 실제로 열고 검증할 것인가”를 따라간다</div>
+        <div class="grid g2" style="margin-top:68px">
+          <div class="layer"><div class="ic">01</div><div class="lt">Why different</div><div class="ld">GPU collective traffic은 한 링크나 한 노드의 지연이 전체 job에 전파된다.</div></div>
+          <div class="layer"><div class="ic">02</div><div class="lt">DGX topology</div><div class="ld">DGX B200은 scale-up NVLink domain과 scale-out IB rails를 동시에 가진다.</div></div>
+          <div class="layer"><div class="ic">03</div><div class="lt">K8s + SR-IOV</div><div class="ld">NAD, Device Plugin, kubelet, CNI가 하나의 VF allocation 흐름을 만든다.</div></div>
+          <div class="layer"><div class="ic">04</div><div class="lt">Failure modes</div><div class="ld">VF가 보여도 RDMA-ready가 아닐 수 있다. GUID, LID, SM, driver binding을 확인한다.</div></div>
+          <div class="layer"><div class="ic">05</div><div class="lt">Operating checklist</div><div class="ld">GPU, NIC, IB switch, Pod visibility를 같은 timeline에서 본다.</div></div>
+          <div class="layer" style="border-style:dashed"><div class="ic">06</div><div class="lt">Takeaways</div><div class="ld">RDMA-ready의 기준과 DGX B200 운영 규칙을 정리한다.</div></div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Storyline</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Thesis">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">operational thesis</span><span class="pill" style="margin-left:auto"><span class="ind"></span>end-to-end fabric</span></div>
+        <div class="s-title">AI 네트워크는 빠른 NIC가 아니라 GPU job의 실행 경로다</div>
+        <p class="s-sub">Ping이 되고 Pod IP가 붙어도 RDMA collective path가 열린 것은 아니다. 실제 운영에서는 GPU affinity, PF/VF, LID/GUID, Subnet Manager, Device Plugin allocation이 하나의 상태로 맞아야 한다.</p>
+        <div class="grid g4" style="margin-top:62px">
+          <div class="tile"><div class="val">8<span class="u">nodes</span></div><div class="lab">DGX B200 cluster</div><div class="delta">64 B200 GPUs</div></div>
+          <div class="tile"><div class="val">8<span class="u">rails</span></div><div class="lab">per DGX network shape</div><div class="delta">GPU-local paths</div></div>
+          <div class="tile"><div class="val">400<span class="u">Gbps</span></div><div class="lab">scale-out IB target</div><div class="delta">NDR-class fabric</div></div>
+          <div class="tile"><div class="val">5<span class="u">checks</span></div><div class="lab">RDMA-ready VF state</div><div class="delta">GUID · LID · SM</div></div>
+        </div>
+        <div class="card soft" style="margin-top:54px">
+          <div class="big-quote" style="font-size:46px;max-width:none">GPU 서버를 샀다고 끝나는 것이 아니라, <span class="accent">GPU 간 통신 경로를 안정적으로 열어주는 것</span>이 운영의 본질이다.</div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>DGX B200 networking in practice</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Cluster shape">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">cluster shape</span></div>
+        <div class="s-title">DGX B200은 network port가 많은 서버가 아니라 topology가 있는 시스템이다</div>
+        <div class="grid g2" style="margin-top:54px;align-items:start">
+          <table class="qtable card soft">
+            <thead><tr><th>layer</th><th>role in the fabric</th></tr></thead>
+            <tbody>
+              <tr><td><b>Compute</b></td><td>DGX B200 8대, 노드당 B200 GPU 8개</td></tr>
+              <tr><td><b>Scale-up</b></td><td>NVLink / NVSwitch가 노드 내부 GPU fabric 구성</td></tr>
+              <tr><td><b>Scale-out</b></td><td>ConnectX-7 기반 InfiniBand / Ethernet path</td></tr>
+              <tr><td><b>Switching</b></td><td>QM9700 또는 QM8700 계열 IB fabric</td></tr>
+              <tr><td><b>Kubernetes</b></td><td>Cilium + Multus + SR-IOV CNI + Device Plugin</td></tr>
+            </tbody>
+          </table>
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">system view</div>
+            <div class="route" style="margin-top:22px">
+              <div class="track">
+                <span class="line"></span>
+                <div class="node"><div class="nm">DGX</div><div class="mt">GPU ×8</div></div>
+                <div class="node"><div class="nm">NIC</div><div class="mt">CX-7 · BF-3</div></div>
+                <div class="node"><div class="nm">IB</div><div class="mt">SM · LID</div></div>
+                <div class="node"><div class="nm">Pod</div><div class="mt">RDMA VF</div></div>
+              </div>
+            </div>
+            <ul class="q-list" style="margin-top:28px">
+              <li><b>GPU locality</b>와 RDMA VF locality를 같이 봐야 한다.</li>
+              <li><b>OSFP, PCI bus, PF/VF, mlx5_x</b> 매핑이 장애 분석의 기준점이다.</li>
+              <li><b>Topology-aware scheduling</b> 없이는 논리적으로 정상이어도 성능이 흔들린다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Cluster shape</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="End-to-end path">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">path model</span></div>
+        <div class="s-title">운영자는 이 경로 전체를 하나의 fabric으로 봐야 한다</div>
+        <div class="stack" style="margin-top:54px">
+          <div class="layer"><div class="ic">01</div><div class="lt">GPU</div><div class="ld">B200 GPU, NCCL collective traffic, local NVLink domain</div><span class="tag">compute</span></div>
+          <div class="layer"><div class="ic">02</div><div class="lt">PCIe / NVSwitch</div><div class="ld">GPU affinity and host topology decide the nearest network path</div><span class="tag">locality</span></div>
+          <div class="layer"><div class="ic">03</div><div class="lt">ConnectX-7 / BF-3</div><div class="ld">PF, VF, RDMA device, firmware, driver binding</div><span class="tag">mlx5</span></div>
+          <div class="layer"><div class="ic">04</div><div class="lt">InfiniBand fabric</div><div class="ld">Subnet Manager, GUID, LID, link width/speed, switch counters</div><span class="tag">fabric</span></div>
+          <div class="layer"><div class="ic">05</div><div class="lt">Kubernetes</div><div class="ld">Device Plugin, Multus, SR-IOV CNI, NAD, kubelet allocation</div><span class="tag">scheduler</span></div>
+          <div class="layer"><div class="ic">06</div><div class="lt">Pod / framework</div><div class="ld">ibv_devinfo, NCCL logs, PyTorch distributed job behavior</div><span class="tag">workload</span></div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>End-to-end path</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Rail topology">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">rail-optimized design</span><span class="pill" style="margin-left:auto"><span class="ind"></span>avoid rail skew</span></div>
+        <div class="s-title">GPU별 rail을 생각하지 않으면 특정 NIC/VF로 트래픽이 몰린다</div>
+        <div class="rails card soft" style="margin-top:50px">
+          <div class="rail-row"><div class="rail-cell">GPU0 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 0 · IB switch</div></div>
+          <div class="rail-row"><div class="rail-cell">GPU1 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 1 · IB switch</div></div>
+          <div class="rail-row"><div class="rail-cell">GPU2 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 2 · IB switch</div></div>
+          <div class="rail-row"><div class="rail-cell">GPU3 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 3 · IB switch</div></div>
+          <div class="rail-row"><div class="rail-cell">GPU4 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 4 · IB switch</div></div>
+          <div class="rail-row"><div class="rail-cell">GPU5 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 5 · IB switch</div></div>
+          <div class="rail-row"><div class="rail-cell">GPU6 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 6 · IB switch</div></div>
+          <div class="rail-row"><div class="rail-cell">GPU7 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 7 · IB switch</div></div>
+        </div>
+        <div class="grid g3" style="margin-top:34px">
+          <div class="tile"><div class="val">1:1</div><div class="lab">GPU-to-rail thinking</div></div>
+          <div class="tile"><div class="val">PF/VF</div><div class="lab">allocation must preserve locality</div></div>
+          <div class="tile"><div class="val">NCCL</div><div class="lab">collective traffic exposes weak links</div></div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Rail topology</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Kubernetes integration">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">kubernetes + rdma</span></div>
+        <div class="s-title">Kubernetes는 AI fabric을 자동으로 이해하지 못한다</div>
+        <div class="route" style="margin-top:58px">
+          <div class="track">
+            <span class="line"></span>
+            <div class="node"><div class="nm">Cilium</div><div class="mt">primary Pod network</div></div>
+            <div class="node"><div class="nm">Multus</div><div class="mt">secondary interface attachment</div></div>
+            <div class="node"><div class="nm">SR-IOV CNI</div><div class="mt">VF injection into Pod</div></div>
+            <div class="node"><div class="nm">Device Plugin</div><div class="mt">resourceName allocation</div></div>
+            <div class="node"><div class="nm">Pod</div><div class="mt">ibv_devinfo visible</div></div>
+          </div>
+        </div>
+        <div class="grid g2" style="margin-top:48px">
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">failure pattern</div>
+            <p style="margin-top:18px;color:var(--ink-muted);font-size:29px;line-height:1.48">GPU는 <span class="mono">nvidia.com/gpu</span>로 정상 할당됐지만 RDMA VF가 먼 NIC에서 들어오면 collective job은 동작해도 성능이 불안정해질 수 있다.</p>
+          </div>
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">operator view</div>
+            <ul class="q-list" style="margin-top:18px">
+              <li>NAD, resourceName, kubelet allocation을 함께 확인한다.</li>
+              <li>Pod 내부 visibility와 fabric-level visibility를 분리해서 본다.</li>
+              <li>Topology Manager와 scheduler 정책을 운영 기준에 포함한다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Kubernetes integration</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="SR-IOV mental model">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">sr-iov on kubernetes</span><span class="pill" style="margin-left:auto"><span class="ind"></span>device path</span></div>
+        <div class="s-title">SR-IOV는 Pod에 “가상 NIC”를 붙이는 기능이 아니라, NIC의 PCI function을 직접 빌려주는 방식이다</div>
+        <div class="grid g2" style="margin-top:54px;align-items:start">
+          <div class="card soft">
+            <div class="vf-strip">
+              <div class="pf">PF<br>ens1f0</div>
+              <div>VF0</div>
+              <div>VF1</div>
+              <div class="selected">VF2</div>
+              <div>VF3</div>
+            </div>
+            <div class="route" style="margin-top:34px">
+              <div class="track">
+                <span class="line"></span>
+                <div class="node"><div class="nm">Host NIC</div><div class="mt">PF owns hardware</div></div>
+                <div class="node"><div class="nm">VF</div><div class="mt">lightweight PCIe function</div></div>
+                <div class="node"><div class="nm">Pod netns</div><div class="mt">secondary interface</div></div>
+                <div class="node"><div class="nm">IB fabric</div><div class="mt">RDMA data path</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">core terms</div>
+            <ul class="q-list" style="margin-top:22px">
+              <li><b>PF</b>는 물리 NIC의 parent function이다. 포트, 펌웨어, VF 생성 정책을 가진다.</li>
+              <li><b>VF</b>는 Pod에 넘겨줄 수 있는 가벼운 PCIe function이다. VM이나 container에서 직접 장치처럼 보인다.</li>
+              <li><b>SR-IOV CNI</b>는 VF를 만들지 않는다. 선택된 VF를 Pod network namespace로 옮기고 IP를 설정한다.</li>
+              <li><b>Device Plugin</b>은 VF 목록을 Kubernetes resource로 광고하고 kubelet allocation에 참여한다.</li>
+              <li><b>Multus</b>는 기본 CNI 옆에 SR-IOV 보조 인터페이스를 붙이는 호출자 역할이다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>SR-IOV mental model</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="SR-IOV flow">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">sr-iov allocation flow</span><span class="pill" style="margin-left:auto"><span class="ind"></span>full diagram</span></div>
+        <div class="s-title" style="font-size:50px">Control plane이 VF allocation을 결정하고, worker node가 VF를 Pod에 붙인다</div>
+        <div class="diagram-callout">볼 지점: Pod resource request → scheduler / kubelet allocation → Multus / SR-IOV CNI → Pod의 <span class="mono">net1</span> secondary interface.</div>
+        <div class="image-frame">
+          <img src="./assets/figure-01.png" alt="How SR-IOV works in Kubernetes flow diagram">
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>SR-IOV flow</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Allocation checks">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">what to verify</span></div>
+        <div class="s-title">SR-IOV 문제를 볼 때는 “network attachment”와 “device allocation”을 분리한다</div>
+        <div class="grid g2" style="margin-top:56px">
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">network attachment path</div>
+            <ul class="q-list" style="margin-top:22px">
+              <li><b>NAD</b>가 어떤 secondary network를 붙일지 정의한다.</li>
+              <li><b>Multus</b>가 Pod annotation을 읽고 SR-IOV CNI를 호출한다.</li>
+              <li><b>SR-IOV CNI</b>가 선택된 VF netdev를 Pod namespace로 옮기고 IPAM을 적용한다.</li>
+            </ul>
+          </div>
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">device allocation path</div>
+            <ul class="q-list" style="margin-top:22px">
+              <li><b>Device Plugin</b>이 VF를 Kubernetes extended resource로 광고한다.</li>
+              <li><b>Scheduler</b>는 해당 resource가 남아 있는 node에 Pod를 배치한다.</li>
+              <li><b>Kubelet Device Manager</b>가 concrete PCI address를 할당한다.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card" style="margin-top:42px;border-color:var(--hairline-strong)">
+          <p style="font-size:32px;color:var(--ink-muted);line-height:1.44"><b style="color:var(--ink)">DGX B200 / IB 관점:</b> VF가 Pod에 들어간 뒤에도 RDMA device, GUID, LID, Subnet Manager, <span class="mono">mlx5_ib</span> binding이 맞아야 실제 RDMA path가 열린다.</p>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Allocation checks</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Resource mapping">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">resource mapping</span><span class="pill" style="margin-left:auto"><span class="ind"></span>yaml to vf</span></div>
+        <div class="s-title" style="font-size:50px">NAD, Device Plugin, Pod spec가 하나의 VF allocation으로 만나는 지점</div>
+        <div class="diagram-callout">볼 지점: NAD의 <span class="mono">resourceName</span>, Device Plugin의 advertised resource, Pod의 resource limit이 같은 이름으로 맞아야 한다.</div>
+        <div class="image-frame">
+          <img src="./assets/figure-02.png" alt="Kubernetes SR-IOV NAD Device Plugin Pod resource mapping diagram">
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Resource mapping</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Operational guardrails">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">operational guardrails</span><span class="pill warn" style="margin-left:auto"><span class="ind"></span>failure-prone edges</span></div>
+        <div class="s-title">SR-IOV 운영에서 반드시 분리해서 볼 4가지</div>
+        <div class="grid g2" style="margin-top:54px">
+          <div class="card soft">
+            <ul class="q-list">
+              <li><b>기본 Pod network와 RDMA network는 목적이 다르다.</b> <span class="mono">eth0</span>는 service/control traffic, <span class="mono">net1</span>은 high-performance data path로 설명한다.</li>
+              <li><b>Multus는 자동으로 RDMA fabric을 완성하지 않는다.</b> 보조 인터페이스를 붙이는 호출 흐름을 제공할 뿐이다.</li>
+              <li><b>Whereabouts는 IPAM이다.</b> IP를 할당하지만 LID/GUID/SM 문제를 해결하지 않는다.</li>
+            </ul>
+          </div>
+          <div class="card soft">
+            <ul class="q-list">
+              <li><b>Device Plugin은 scheduling resource를 만든다.</b> CNI가 어느 VF를 써야 하는지 알 수 있게 kubelet allocation과 연결된다.</li>
+              <li><b>Pod에 VF가 보이는 것과 RDMA 가능 상태는 다르다.</b> <span class="mono">ibv_devinfo</span>, LID, GUID, driver binding을 확인한다.</li>
+              <li><b>GPU locality가 빠지면 성능 문제가 남는다.</b> GPU와 VF가 같은 rail/local NIC에 가까운지 확인한다.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card" style="margin-top:42px;border-color:var(--hairline-strong)">
+          <p style="font-size:34px;color:var(--ink-muted);line-height:1.42"><b style="color:var(--ink)">한 문장으로:</b> SR-IOV on K8s는 “NAD로 network를 고르고, Device Plugin으로 VF resource를 예약하고, kubelet과 CNI가 선택된 VF를 Pod namespace로 옮기는 흐름”이다.</p>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Operational guardrails</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Troubleshooting">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">troubleshooting case</span><span class="pill danger" style="margin-left:auto"><span class="ind"></span>VF visible != RDMA ready</span></div>
+        <div class="s-title">VF가 보이는 것과 InfiniBand fabric에서 통신 가능한 것은 다르다</div>
+        <div class="grid g2" style="margin-top:52px;align-items:start">
+          <div class="term">
+            <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="name">pod@training-job:~</span></div>
+            <div class="body">
+              <span class="p">$</span> lspci | grep Mellanox<br>
+              <span class="ok">VF present</span><br>
+              <span class="p">$</span> kubectl describe node | grep rdma<br>
+              <span class="ok">resource exposed</span><br>
+              <span class="p">$</span> ibv_devinfo<br>
+              <span class="bad">no active LID / unusable RDMA path</span><br>
+              <span class="dim"># device exists, fabric membership is incomplete</span>
+            </div>
+          </div>
+          <div class="card soft">
+            <table class="qtable">
+              <thead><tr><th>check</th><th>why it matters</th></tr></thead>
+              <tbody>
+                <tr><td><b>GUID</b></td><td>VF identity must be set and visible.</td></tr>
+                <tr><td><b>LID</b></td><td>Subnet Manager must admit the endpoint.</td></tr>
+                <tr><td><b>mlx5_ib</b></td><td>RDMA driver binding must be correct.</td></tr>
+                <tr><td><b>SM state</b></td><td>IB fabric control plane must be healthy.</td></tr>
+                <tr><td><b>PF/VF mapping</b></td><td>Wrong port mapping creates false positives.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="margin-top:40px;border-color:var(--hairline-strong)">
+          <p style="font-size:31px;color:var(--ink-muted);line-height:1.45"><b style="color:var(--ink)">교훈:</b> VF 생성은 시작일 뿐이다. RDMA 가능 상태는 <span class="mono">GUID + LID + mlx5_ib + SM + fabric visibility</span>까지 닫혀야 한다.</p>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Troubleshooting</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Observability">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">observability checklist</span></div>
+        <div class="s-title">GPU만 보면 원인을 놓친다. Fabric, kubelet, Pod 로그를 같이 본다</div>
+        <div class="grid g3" style="margin-top:54px">
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">node / gpu</div>
+            <ul class="q-list" style="margin-top:18px">
+              <li><span class="mono">nvidia-smi topo -m</span></li>
+              <li><span class="mono">mst status</span></li>
+              <li><span class="mono">devlink dev show</span></li>
+            </ul>
+          </div>
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">infiniband / rdma</div>
+            <ul class="q-list" style="margin-top:18px">
+              <li><span class="mono">ibstat</span></li>
+              <li><span class="mono">ibv_devinfo</span></li>
+              <li><span class="mono">iblinkinfo</span></li>
+              <li><span class="mono">perfquery</span></li>
+            </ul>
+          </div>
+          <div class="card soft">
+            <div class="eyebrow" style="font-size:20px">kubernetes</div>
+            <ul class="q-list" style="margin-top:18px">
+              <li><span class="mono">kubectl describe node</span></li>
+              <li><span class="mono">kubectl get network-attachment-definitions</span></li>
+              <li><span class="mono">kubectl logs ds/sriov-device-plugin</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="grid g4" style="margin-top:42px">
+          <div class="tile"><div class="val">GPU</div><div class="lab">utilization and NCCL behavior</div></div>
+          <div class="tile"><div class="val">NIC</div><div class="lab">RDMA throughput and counters</div></div>
+          <div class="tile"><div class="val">IB</div><div class="lab">LID/GUID and switch health</div></div>
+          <div class="tile"><div class="val">Pod</div><div class="lab">actual device visibility</div></div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Observability</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Takeaways">
+    <div class="slide glow">
+      <div class="pad" style="justify-content:center">
+        <div class="eyebrow">closing messages</div>
+        <div class="s-title" style="font-size:70px;max-width:1320px">RDMA-ready는 Kubernetes와 InfiniBand 양쪽에서 동시에 검증된 상태다</div>
+        <div class="grid g2" style="margin-top:58px">
+          <div class="card soft"><ul class="q-list">
+            <li><b>AI 데이터센터 네트워크는 서버 네트워크가 아니라 GPU fabric이다.</b></li>
+            <li><b>DGX B200은 topology가 있는 system이다.</b> OSFP, NIC, RDMA device, GPU affinity를 같이 본다.</li>
+            <li><b>Kubernetes는 fabric을 자동으로 이해하지 못한다.</b> Cilium, Multus, SR-IOV, Device Plugin, scheduler를 연결해야 한다.</li>
+          </ul></div>
+          <div class="card soft"><ul class="q-list">
+            <li><b>VF 생성과 RDMA 가능 상태는 다르다.</b> GUID, LID, SM, mlx5_ib까지 확인한다.</li>
+            <li><b>운영의 본질은 관측 가능성이다.</b> 어느 레이어에서 깨졌는지 빠르게 식별해야 한다.</li>
+          </ul></div>
+        </div>
+        <div class="card" style="margin-top:42px;border-color:var(--hairline-strong)">
+          <p style="font-size:34px;color:var(--ink-muted);line-height:1.42"><b style="color:var(--ink)">Operational rule:</b> VF는 Kubernetes에 보이고, Linux에서 bind되고, IB fabric에서 LID/GUID를 받고, GPU path와 locality가 맞을 때 RDMA-ready로 본다.</p>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Takeaways</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+</deck-stage>
+
+<script src="deck-stage.js"></script>
+<script>
+  const stage = document.querySelector("deck-stage");
+  const slides = [...stage.querySelectorAll("section")];
+  slides.forEach((section, index) => {
+    section.querySelectorAll("[data-brand]").forEach((brand) => {
+      brand.innerHTML = '<img src="./assets/quietfabric-mark.svg" alt="">QuietFabric';
+    });
+    section.querySelectorAll("[data-num]").forEach((num) => {
+      num.textContent = `${String(index + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
+    });
+  });
+
+  const themeToggle = document.getElementById("themeToggle");
+  const themeLabel = document.getElementById("themeLabel");
+  themeToggle.addEventListener("click", () => {
+    const root = document.documentElement;
+    const next = root.dataset.theme === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    themeLabel.textContent = next;
+  });
+</script>
+</body>
+</html>
