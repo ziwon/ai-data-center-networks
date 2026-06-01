@@ -20,7 +20,7 @@
           <div><b>8 DGX B200</b>cluster scale</div>
           <div><b>400G IB</b>scale-out fabric</div>
           <div><b>K8s + RDMA</b>workload plane</div>
-          <div><a href="https://github.com/ziwon" target="_blank" rel="noopener noreferrer"><b>github.com/ziwon</b></a>author</div>
+          <div><a href="https://github.com/ziwon" target="_blank" rel="noopener noreferrer"><b>github.com/ziwon</b></a>ai platform architect</div>
         </div>
       </div>
       <div class="route" style="padding:20px;display:grid;place-items:center">
@@ -32,7 +32,7 @@
   <section data-label="Agenda">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">storyline</span><span class="pill" style="margin-left:auto"><span class="ind"></span>20 min</span></div>
+        <div class="s-head"><span class="eyebrow">storyline</span></div>
         <div class="s-title">Operational flow for GPU fabric</div>
         <div class="grid g2" style="margin-top:68px">
           <div class="layer"><div class="ic">01</div><div class="lt">Why different</div><div class="ld">Collective traffic exposes every weak link.</div></div>
@@ -50,8 +50,9 @@
   <section data-label="Thesis">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">operational thesis</span><span class="pill" style="margin-left:auto"><span class="ind"></span>end-to-end fabric</span></div>
+        <div class="s-head"><span class="eyebrow">operational thesis</span></div>
         <div class="s-title">AI networking is the job path</div>
+        <div class="principle">The network path is part of the GPU platform.</div>
         <p class="s-sub">Ping and Pod IP are not enough. RDMA-ready means GPU locality, PF/VF mapping, GUID/LID, Subnet Manager state, and Kubernetes allocation all line up.</p>
         <div class="grid g4" style="margin-top:62px">
           <div class="tile"><div class="val">8<span class="u">nodes</span></div><div class="lab">DGX B200 cluster</div><div class="delta">64 B200 GPUs</div></div>
@@ -127,7 +128,7 @@
   <section data-label="Rail topology">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">rail-optimized design</span><span class="pill" style="margin-left:auto"><span class="ind"></span>avoid rail skew</span></div>
+        <div class="s-head"><span class="eyebrow">rail-optimized design</span></div>
         <div class="s-title">Rail locality matters</div>
         <div class="rails card soft" style="margin-top:40px;padding:24px 34px;gap:10px 20px">
           <div class="rail-row"><div class="rail-cell">GPU0 · local NIC</div><div class="rail-line"></div><div class="rail-cell">Rail 0 · IB switch</div></div>
@@ -186,7 +187,7 @@
   <section data-label="SR-IOV mental model">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">sr-iov on kubernetes</span><span class="pill" style="margin-left:auto"><span class="ind"></span>device path</span></div>
+        <div class="s-head"><span class="eyebrow">sr-iov on kubernetes</span></div>
         <div class="s-title">SR-IOV assigns a PCI function</div>
         <div class="grid g2" style="margin-top:54px;align-items:start">
           <div class="card soft">
@@ -226,9 +227,8 @@
   <section data-label="SR-IOV flow">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">sr-iov allocation flow</span><span class="pill" style="margin-left:auto"><span class="ind"></span>full diagram</span></div>
+        <div class="s-head"><span class="eyebrow">sr-iov allocation flow</span></div>
         <div class="s-title" style="font-size:50px">VF allocation flow</div>
-        <div class="diagram-callout">Note: Pod resource request → scheduler / kubelet allocation → Multus / SR-IOV CNI → Pod <span class="mono">net1</span>.</div>
         <div class="image-frame">
           <img src="./assets/figure-01.png" alt="How SR-IOV works in Kubernetes flow diagram">
         </div>
@@ -271,9 +271,8 @@
   <section data-label="Resource mapping">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">resource mapping</span><span class="pill" style="margin-left:auto"><span class="ind"></span>yaml to vf</span></div>
+        <div class="s-head"><span class="eyebrow">resource mapping</span></div>
         <div class="s-title" style="font-size:50px">Resource name alignment</div>
-        <div class="diagram-callout">Note: NAD <span class="mono">resourceName</span>, Device Plugin resource, and Pod limit must match.</div>
         <div class="image-frame">
           <img src="./assets/figure-02.png" alt="Kubernetes SR-IOV NAD Device Plugin Pod resource mapping diagram">
         </div>
@@ -285,7 +284,7 @@
   <section data-label="Operational guardrails">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">operational guardrails</span><span class="pill warn" style="margin-left:auto"><span class="ind"></span>failure-prone edges</span></div>
+        <div class="s-head"><span class="eyebrow">operational guardrails</span></div>
         <div class="s-title">Four SR-IOV guardrails</div>
         <div class="grid g2" style="margin-top:54px">
           <div class="card soft">
@@ -314,7 +313,7 @@
   <section data-label="Troubleshooting">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">troubleshooting case</span><span class="pill danger" style="margin-left:auto"><span class="ind"></span>VF visible != RDMA ready</span></div>
+        <div class="s-head"><span class="eyebrow">troubleshooting case</span></div>
         <div class="s-title">Visible VF ≠ usable RDMA</div>
         <div class="grid g2" style="margin-top:38px;align-items:start">
           <div class="term">
@@ -333,10 +332,10 @@
             <table class="qtable">
               <thead><tr><th>check</th><th>why it matters</th></tr></thead>
               <tbody>
-                <tr><td><b>GUID</b></td><td>VF identity must be set and visible.</td></tr>
-                <tr><td><b>LID</b></td><td>Subnet Manager must admit the endpoint.</td></tr>
-                <tr><td><b>mlx5_ib</b></td><td>RDMA driver binding must be correct.</td></tr>
-                <tr><td><b>SM state</b></td><td>IB fabric control plane must be healthy.</td></tr>
+                <tr><td><b>GUID</b></td><td>Device identity on the InfiniBand fabric.</td></tr>
+                <tr><td><b>LID</b></td><td>Fabric address assigned by the Subnet Manager.</td></tr>
+                <tr><td><b>SM state</b></td><td>Subnet Manager: the IB control plane that admits endpoints.</td></tr>
+                <tr><td><b>mlx5_ib</b></td><td>Linux RDMA driver for NVIDIA/Mellanox NICs.</td></tr>
                 <tr><td><b>PF/VF mapping</b></td><td>Wrong port mapping creates false positives.</td></tr>
               </tbody>
             </table>
@@ -400,7 +399,7 @@
   <section data-label="Mellanox case">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">case study</span><span class="pill warn" style="margin-left:auto"><span class="ind"></span>systemd-networkd vs SR-IOV CNI</span></div>
+        <div class="s-head"><span class="eyebrow">case study</span></div>
         <div class="s-title">VF ownership conflict</div>
         <div class="grid g2" style="margin-top:52px;align-items:start">
           <div class="card soft">
@@ -425,7 +424,7 @@
   <section data-label="VF ownership flow">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">failure flow</span><span class="pill danger" style="margin-left:auto"><span class="ind"></span>who owns the VF?</span></div>
+        <div class="s-head"><span class="eyebrow">failure flow</span></div>
         <div class="s-title">Host owns VF, Pod loses <span class="mono">net1</span></div>
         <div class="grid g2" style="margin-top:42px;align-items:start">
           <div class="term">
@@ -469,7 +468,7 @@
   <section data-label="Lifecycle resolution">
     <div class="slide">
       <div class="pad">
-        <div class="s-head"><span class="eyebrow">resolution</span><span class="pill" style="margin-left:auto"><span class="ind"></span>unmanaged on host</span></div>
+        <div class="s-head"><span class="eyebrow">resolution</span></div>
         <div class="s-title">Keep VFs unmanaged on host</div>
         <div class="grid g2" style="margin-top:50px;align-items:start">
           <div class="card soft">
@@ -523,6 +522,78 @@
         </div>
       </div>
       <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Takeaways</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Further reading">
+    <div class="slide">
+      <div class="pad">
+        <div class="s-head"><span class="eyebrow">further reading</span></div>
+        <div class="s-title">Implementation sources and vendor docs</div>
+        <div class="ref-grid">
+          <div class="ref-item">
+            <a href="https://docs.nvidia.com/networking/display/kubernetes2410/K8s%2Bon%2BBare%2BMetal%2B-%2BEthernet" target="_blank" rel="noopener noreferrer">NVIDIA K8s on Bare Metal - Ethernet</a>
+            <p>Bare-metal Kubernetes, SR-IOV, RDMA/RoCE, and NVIDIA NICs.</p>
+          </div>
+          <div class="ref-item">
+            <a href="https://docs.nvidia.com/dgx/dgxb200-user-guide/" target="_blank" rel="noopener noreferrer">NVIDIA DGX B200 User Guide</a>
+            <p>DGX B200 system overview, GPU, NVLink/NVSwitch, and networking hardware.</p>
+          </div>
+          <div class="ref-item">
+            <a href="https://docs.nvidia.com/dgx/dgxb200-user-guide/introduction-to-dgxb200.html" target="_blank" rel="noopener noreferrer">Introduction to NVIDIA DGX B200 Systems</a>
+            <p>Component descriptions for DGX B200 compute, storage, and network cards.</p>
+          </div>
+          <div class="ref-item">
+            <a href="https://docs.nvidia.com/networking/display/kubernetes2310/network%2Boperator" target="_blank" rel="noopener noreferrer">NVIDIA Network Operator</a>
+            <p>Kubernetes RDMA, GPUDirect, SR-IOV, and NVIDIA networking components.</p>
+          </div>
+          <div class="ref-item">
+            <a href="https://docs.nvidia.com/doca/archive/2-9-4/Kubernetes-Using-SR-IOV/index.html" target="_blank" rel="noopener noreferrer">NVIDIA DOCA: Kubernetes Using SR-IOV</a>
+            <p>SR-IOV CNI and RDMA device plugin concepts for Kubernetes Pods.</p>
+          </div>
+          <div class="ref-item">
+            <a href="https://github.com/k8snetworkplumbingwg/multus-cni" target="_blank" rel="noopener noreferrer">Multus CNI</a>
+            <p>Secondary network attachment and multi-homed Pods in Kubernetes.</p>
+          </div>
+          <div class="ref-item">
+            <a href="https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin" target="_blank" rel="noopener noreferrer">SR-IOV Network Device Plugin</a>
+            <p>Advertising and allocating SR-IOV VF resources through Kubernetes.</p>
+          </div>
+          <div class="ref-item">
+            <a href="https://docs.nvidia.com/networking/display/gpudirectrdmav18" target="_blank" rel="noopener noreferrer">NVIDIA GPUDirect RDMA User Manual</a>
+            <p>Direct RDMA data paths between NVIDIA GPUs and network adapters.</p>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Further reading</span><span class="num" data-num></span></div>
+    </div>
+  </section>
+
+  <section data-label="Production profile">
+    <div class="slide">
+      <div class="pad">
+        <div class="outro-layout">
+          <div>
+            <div class="outro-photo">
+              <img src="./assets/outro.jpg" alt="AI platform architect profile photo in a server room">
+            </div>
+            <div class="outro-contact"><a href="https://github.com/ziwon" target="_blank" rel="noopener noreferrer">github.com/ziwon</a></div>
+          </div>
+          <div>
+            <div class="outro-title">AI Platform Architect</div>
+            <div class="outro-rule"></div>
+            <p class="outro-summary">Building reliable infrastructure for AI systems,<br>from GPU fabrics to agentic workflows.</p>
+            <div class="outro-focus">
+              <div>AI Infrastructure</div>
+              <div>Data Center Networking</div>
+              <div>LLMOps &amp; Model Serving</div>
+              <div>Agentic AI</div>
+            </div>
+            <div class="outro-note">The horizon keeps moving.<br><em>That's why I'm still learning, still building.</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span class="brand" data-brand></span><span class="grow"></span><span>Production profile</span><span class="num" data-num></span></div>
     </div>
   </section>
 </deck-stage>
